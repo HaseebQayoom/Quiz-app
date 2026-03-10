@@ -1,10 +1,10 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:quiz_app_api/data/question.dart';
 import 'package:quiz_app_api/summary/question_summary.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ResultScreen extends StatefulWidget {
   const ResultScreen({
@@ -21,6 +21,9 @@ class ResultScreen extends StatefulWidget {
 }
 
 class _ResultScreenState extends State<ResultScreen> {
+  final url = Uri.https(dotenv.env['API_KEY']!, 'quiz-result.json');
+  List<int> prevResult = [];
+
   List<Map<String, Object>> userSummary() {
     List<Map<String, Object>> summary = [];
 
@@ -35,44 +38,105 @@ class _ResultScreenState extends State<ResultScreen> {
     return summary;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final getUserSummary = userSummary();
-    String? error;
-    bool isLoading = false;
+  late final getUserSummary = userSummary();
+  String? error;
+  bool isLoading = false;
 
-    final totalCorrectAnswer = getUserSummary.where((data) {
-      return data['user_answer'] == data['correct_answer'];
-    }).length;
+  late final totalCorrectAnswer = getUserSummary.where((data) {
+    return data['user_answer'] == data['correct_answer'];
+  }).length;
 
-    // void rSummary() {}
+  Future<void> previousResult() async {
+    List<int> preVResult = [];
 
-    savingResult() async {
-      setState(() {
-        isLoading = true;
-      });
-      try {
-        final url = Uri.https(
-          'quiz-results-7b912-default-rtdb.firebaseio.com',
-          'quiz-result.json',
-        );
+    try {
+      // final url = Uri.https(dotenv.env['API_KEY']!, 'quiz_result.json');
+      // final url = Uri.https(dotenv.env["API_KEY"]!, 'quiz_result.json');
 
-        await http.post(
-          url,
-          headers: {'Content-type': 'application/json'},
-          body: json.encode({'total_correct': totalCorrectAnswer}),
-        );
+      final respone = await http.get(url);
+      // print(respone.body);
 
-        widget.restartQuiz;
-      } catch (e) {
-        error = 'Somthing went wrong in saving the data';
+      if (respone.statusCode >= 400) {
+        print('Status code is ${respone.statusCode}');
       }
-      setState(() {
-        isLoading = false;
-      });
+      final results = await jsonDecode(
+        respone.body,
+      ); //yaha await lagana bhol gaya tha jes ke waja sa initState function he nhi arha tha
+
+      // print('3$results');
+
+      for (var res in results.entries) {
+        preVResult.add(res.value['total_correct_answer']);
+      }
+
+      //  for(var ans in preVResult){
+      //   dropDown.add(DropdownMenuItem(child: Text('You have correctly answered $ans from 5 quesions')));
+      //  }
+    } catch (e) {
+      error = 'error while fetching data';
     }
 
-    Widget content = Column(
+    // setState(() {
+    //   prevResult = preVResult;
+    // });
+    // print('4$prevResult');
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var ans in preVResult)
+              Text(
+                'You have correctly answered $ans from 5 questions',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> savingResult() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // final url = Uri.https(dotenv.env['API_KEY']!, 'quiz-result.json');
+
+      // final response = await http.get(url);
+      // print('2');
+      // print(response.body);
+
+      await http.post(
+        url,
+        headers: {'Content-type': 'application/json'},
+        body: json.encode({'total_correct_answer': totalCorrectAnswer}),
+      );
+      // previousResult();
+      widget.restartQuiz();
+    } catch (e) {
+      error = 'Somthing went wrong in saving the data';
+    }
+
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget content;
+    if (error != null) {
+      content = Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [Text(error!)],
+      );
+    }
+    content = Column(
       mainAxisAlignment: MainAxisAlignment.center,
 
       children: [
@@ -93,11 +157,23 @@ class _ResultScreenState extends State<ResultScreen> {
 
         const SizedBox(height: 20),
 
-        //  Expanded(child: Row(
-        //   children: [
-        //     DropdownButton(items: , onChanged: onChanged)
-        //   ],
-        //  )),
+        // DropdownButton(
+        //   value: Text('Previous results'),
+        //   items: prevResult
+        //       .map(
+        //         (ans) => DropdownMenuItem(
+        //           value: Text('prev result'),
+        //           child: Text(
+        //             'You have correctly answered $ans out of 5 questions',
+        //           ),
+        //         ),
+        //       )
+        //       .toList(),
+        //   onChanged: (value) => value,
+        // ),
+        TextButton(onPressed: previousResult, child: Text('Previous answer')),
+
+        const SizedBox(height: 20),
         isLoading
             ? CircularProgressIndicator()
             : ElevatedButton.icon(
@@ -118,13 +194,6 @@ class _ResultScreenState extends State<ResultScreen> {
               ),
       ],
     );
-
-    if (error != null) {
-      content = Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [Text(error!)],
-      );
-    }
 
     return SizedBox(
       width: double.infinity,

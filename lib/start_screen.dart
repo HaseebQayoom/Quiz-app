@@ -6,14 +6,15 @@ class StartScreen extends StatelessWidget {
 
   final void Function() startQuiz;
 
-  final image1 = 'assets/frontpage.jpg';
+  final image1 = 'assets/fontpage.png';
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Image.asset(image1),
+        Image.asset(image1,
+        height: 80,),
         const SizedBox(height: 20),
         Text(
           'Learn flutter the fun way!',
